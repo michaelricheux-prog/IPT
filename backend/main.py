@@ -1,5 +1,8 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles # Nouveau
+from fastapi.responses import FileResponse # Nouveau
+
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -201,3 +204,21 @@ def delete_bloc(bloc_id: int, db: Session = Depends(get_db)):
     db.commit()
     
     return {"ok": True}
+
+# ----------------------------------------------------------------------
+# SERVIR LES FICHIERS STATIQUES (FRONTEND)
+# ----------------------------------------------------------------------
+
+# 1. Montage du répertoire statique (CSS, JS, images).
+# Le dossier 'static' se trouve dans le répertoire principal de votre frontend.
+# Assurez-vous que le chemin est correct, ex: 'frontend/static' ou 'static'
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+# 2. Route racine pour servir l'index.html
+# Cette route doit pointer vers votre fichier index.html
+@app.get("/", include_in_schema=False)
+async def serve_index():
+    # Assurez-vous que le chemin vers votre index.html est correct
+    # (Exemple : il est à la racine de votre projet ou dans un dossier 'frontend')
+    return FileResponse("index.html")
