@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
+from fastapi.middleware.cors import CORSMiddleware
 
 # Importations des fichiers locaux pour la BDD et les schémas
 from . import models, schemas
@@ -12,7 +13,21 @@ from .models import Bloc
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+# Configuration CORS (permet au frontend d'accéder à l'API)
+origins = [
+    "http://localhost",
+    "http://localhost:8000",
+    # Ajoutez l'origine "null" pour autoriser l'accès depuis le fichier local index.html
+    "null", 
+]
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 # ----------------------------------------------------------------------
 # ROUTES D'API (CRUD)
 # ----------------------------------------------------------------------
