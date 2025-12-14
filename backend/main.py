@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List
-from pathlib import Path # NOUVEL IMPORT
+from pathlib import Path
 
 # Importations des fichiers locaux pour la BDD et les schémas
 from . import models, schemas
@@ -12,10 +12,9 @@ from .database import engine, get_db
 from .models import Bloc
 
 # ----------------------------------------------------------------------
-# CHEMINS ABSOLUS POUR FICHIERS STATIQUES (RÉSOLUTION DE L'ERREUR 404/Not Found)
+# CHEMINS ABSOLUS POUR FICHIERS STATIQUES
 # ----------------------------------------------------------------------
-# Path(__file__).resolve().parent est le dossier 'backend/'
-# .parent.parent remonte à la racine du projet, ce qui résout le problème des chemins.
+# Remonte à la racine du projet (du dossier 'backend/' à '/')
 BASE_DIR = Path(__file__).resolve().parent.parent 
 # ----------------------------------------------------------------------
 
@@ -25,7 +24,7 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-# Configuration CORS (permet au frontend d'accéder à l'API)
+# Configuration CORS
 origins = [
     "http://localhost",
     "http://localhost:8000",
@@ -52,15 +51,18 @@ def is_cyclic_dependency(db: Session, bloc_id: int, depend_on_id: int) -> bool:
 
     current_id = depend_on_id
 
+    # Parcourir la chaîne de dépendances à partir du bloc prédécesseur
     while current_id is not None:
         db_bloc = db.query(models.Bloc).filter(models.Bloc.id == current_id).first()
 
         if db_bloc is None:
             return False 
 
+        # Si nous retombons sur le bloc original (bloc_id), il y a un cycle !
         if db_bloc.bloc_precedent_id == bloc_id:
             return True 
 
+        # Passer au bloc précédent dans la chaîne
         current_id = db_bloc.bloc_precedent_id
 
     return False
@@ -78,10 +80,10 @@ def create_bloc(bloc: schemas.BlocCreate, db: Session = Depends(get_db)):
         
         db_bloc = models.Bloc(**bloc.dict())
         db.add(db_bloc)
-        db.flush()
+        db.flush() # Obtient l'ID du nouveau bloc
 
         if is_cyclic_dependency(db, db_bloc.id, bloc.bloc_precedent_id):
-            db.rollback()
+            db.rollback() # Annuler les changements
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Dépendance circulaire détectée : Le bloc {bloc.bloc_precedent_id} dépend déjà (directement ou indirectement) de ce nouveau bloc."
@@ -196,7 +198,7 @@ def delete_bloc(bloc_id: int, db: Session = Depends(get_db)):
 # ----------------------------------------------------------------------
 
 # 1. Montage du répertoire statique (CSS, JS, images).
-# Utilise BASE_DIR pour pointer vers le dossier 'static' à la racine.
+# Le chemin est basé sur BASE_DIR pour pointer vers le dossier 'static' à la racine.
 app.mount(
     "/static", 
     StaticFiles(directory=str(BASE_DIR / "static")),
@@ -207,5 +209,5 @@ app.mount(
 # 2. Route racine pour servir l'index.html
 @app.get("/", include_in_schema=False)
 async def serve_index():
-    # Utilise BASE_DIR pour pointer vers le fichier 'index.html' à la racine.
+    # Le chemin est basé sur BASE_DIR pour pointer vers le fichier 'index.html' à la racine.
     return FileResponse(BASE_DIR / "index.html")
