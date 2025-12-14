@@ -1,115 +1,103 @@
+from fastapi import FastAPI, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 from typing import List
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
-from datetime import datetime
 
-# Imports des modules locaux du package 'backend' (imports relatifs)
-from .schemas import Bloc, BlocBase
-from .calculs_temporels import verifier_chevauchement, calculer_duree
+# Importations des fichiers locaux pour la BDD et les schémas
+from . import models, schemas
+from .database import engine, get_db
+from .models import Bloc
 
-# --- Initialisation de l'API et Données Simples ---
+# Crée les tables dans la base de données (si elles n'existent pas)
+# C'est ce qui génère le fichier sqlite.db au démarrage
+models.Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="API Planificateur Temporel")
+app = FastAPI()
 
-# Base de données simulée (remplacée par une BDD réelle plus tard)
-db_blocs: List[Bloc] = []
-bloc_id_counter = 1
+# ----------------------------------------------------------------------
+# ROUTES D'API (CRUD)
+# ----------------------------------------------------------------------
 
-# --- Fonction élémentaire de lecture (CRUD: R) ---
-
-@app.get("/blocs", response_model=List[Bloc])
-def lire_blocs():
-    """Récupère la liste de tous les blocs enregistrés."""
-    return db_blocs
-
-@app.get("/blocs/duree/{bloc_id}", response_model=float)
-def lire_duree_bloc(bloc_id: int):
-    """Calcule et récupère la durée en heures d'un bloc par son ID."""
-    for bloc in db_blocs:
-        if bloc.id == bloc_id:
-            return calculer_duree(bloc.heure_debut, bloc.heure_fin)
-    raise HTTPException(status_code=404, detail="Bloc non trouvé")
-
-# --- Fonction élémentaire de création (CRUD: C) ---
-
-@app.post("/blocs", response_model=Bloc, status_code=201)
-def creer_bloc(bloc: BlocBase):
-    """Crée un nouveau bloc après vérification de l'heure et du chevauchement."""
-    global bloc_id_counter
-
-    # 1. Logique métier modulaire : Vérification du chevauchement
-    if verifier_chevauchement(bloc, db_blocs):
-        raise HTTPException(
-            status_code=400, 
-            detail="Le nouveau bloc chevauche un événement existant."
-        )
-
-    # 2. Création du bloc avec un ID unique
-    nouveau_bloc = Bloc(id=bloc_id_counter, **bloc.model_dump())
+# 1. CRÉER un nouveau bloc (POST)
+# Utilise get_db() pour obtenir une session de BDD
+@app.post("/blocs/", response_model=schemas.Bloc, status_code=status.HTTP_201_CREATED)
+def create_bloc(bloc: schemas.BlocCreate, db: Session = Depends(get_db)):
+    """
+    Crée un nouveau bloc dans la base de données.
+    """
+    # Crée une instance du modèle SQLAlchemy à partir des données Pydantic
+    db_bloc = models.Bloc(**bloc.model_dump())
     
-    # 3. Sauvegarde dans la "base de données"
-    db_blocs.append(nouveau_bloc)
-    bloc_id_counter += 1
+    # Ajoute l'objet à la session, l'enregistre dans la BDD et rafraîchit l'objet
+    db.add(db_bloc)
+    db.commit()
+    db.refresh(db_bloc) # Récupère l'ID généré par la BDD
     
-    return nouveau_bloc
+    return db_bloc
 
-# --- Fonction élémentaire de mise à jour (CRUD: U) ---
+# 2. LIRE tous les blocs (GET)
+@app.get("/blocs/", response_model=List[schemas.Bloc])
+def read_blocs(db: Session = Depends(get_db)):
+    """
+    Récupère la liste complète de tous les blocs.
+    """
+    # Interroge la BDD pour obtenir tous les blocs
+    blocs = db.query(models.Bloc).all()
+    return blocs
 
-@app.put("/blocs/{bloc_id}", response_model=Bloc)
-def modifier_bloc(bloc_id: int, bloc_data: BlocBase):
-    """Met à jour un bloc existant par son ID, vérifie le chevauchement."""
+# 3. LIRE un bloc spécifique par ID (GET)
+@app.get("/blocs/{bloc_id}", response_model=schemas.Bloc)
+def read_bloc(bloc_id: int, db: Session = Depends(get_db)):
+    """
+    Récupère un bloc spécifique basé sur son ID.
+    """
+    # Interroge la BDD pour obtenir un bloc par ID
+    db_bloc = db.query(models.Bloc).filter(models.Bloc.id == bloc_id).first()
     
-    # 1. Vérification de l'existence du bloc
-    bloc_index = -1
-    for i, bloc in enumerate(db_blocs):
-        if bloc.id == bloc_id:
-            bloc_index = i
-            break
-            
-    if bloc_index == -1:
+    if db_bloc is None:
         raise HTTPException(status_code=404, detail="Bloc non trouvé")
-
-    # 2. Préparation de la vérification de chevauchement
-    # Crée une liste de tous les blocs SAUF celui que l'on modifie
-    blocs_a_verifier = [b for i, b in enumerate(db_blocs) if i != bloc_index]
     
-    # 3. Préparation des données mises à jour
-    bloc_actuel = db_blocs[bloc_index]
+    return db_bloc
+
+# 4. METTRE À JOUR un bloc (PATCH)
+@app.patch("/blocs/{bloc_id}", response_model=schemas.Bloc)
+def update_bloc(bloc_id: int, bloc_update: schemas.BlocUpdate, db: Session = Depends(get_db)):
+    """
+    Met à jour un ou plusieurs champs d'un bloc existant.
+    """
+    # 1. Trouver le bloc
+    db_bloc = db.query(models.Bloc).filter(models.Bloc.id == bloc_id).first()
     
-    # Création d'un modèle temporaire pour les vérifications
-    champs_a_mettre_a_jour = bloc_data.model_dump(exclude_unset=True)
-    temp_bloc = Bloc(id=bloc_id, **bloc_actuel.model_dump(), **champs_a_mettre_a_jour)
-
-    # 4. Logique métier modulaire : Vérification du chevauchement
-    if verifier_chevauchement(temp_bloc, blocs_a_verifier):
-        raise HTTPException(
-            status_code=400, 
-            detail="La nouvelle position chevauche un autre bloc."
-        )
-
-    # 5. Application de la mise à jour (si validation réussie)
-    db_blocs[bloc_index] = temp_bloc
-    
-    return temp_bloc
-
-# --- Fonction élémentaire de suppression (CRUD: D) ---
-
-@app.delete("/blocs/{bloc_id}", status_code=204)
-def supprimer_bloc(bloc_id: int):
-    """Supprime un bloc existant par son ID."""
-    global db_blocs
-    
-    bloc_index = -1
-    for i, bloc in enumerate(db_blocs):
-        if bloc.id == bloc_id:
-            bloc_index = i
-            break
-            
-    if bloc_index == -1:
+    if db_bloc is None:
         raise HTTPException(status_code=404, detail="Bloc non trouvé")
-
-    # Suppression du bloc de la liste
-    db_blocs.pop(bloc_index)
     
-    # Retourne 204 (No Content)
-    return
+    # 2. Mettre à jour les champs (uniquement ceux qui sont fournis)
+    # model_dump(exclude_unset=True) exclut les champs qui n'ont pas été fournis dans le body de la requête
+    update_data = bloc_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_bloc, key, value)
+        
+    # 3. Enregistrer les changements dans la BDD
+    db.add(db_bloc)
+    db.commit()
+    db.refresh(db_bloc)
+    
+    return db_bloc
+
+# 5. SUPPRIMER un bloc (DELETE)
+@app.delete("/blocs/{bloc_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_bloc(bloc_id: int, db: Session = Depends(get_db)):
+    """
+    Supprime un bloc de la base de données.
+    """
+    # 1. Trouver le bloc
+    db_bloc = db.query(models.Bloc).filter(models.Bloc.id == bloc_id).first()
+    
+    if db_bloc is None:
+        raise HTTPException(status_code=404, detail="Bloc non trouvé")
+    
+    # 2. Supprimer l'objet
+    db.delete(db_bloc)
+    db.commit()
+    
+    # 3. Retourner une réponse de succès (204 No Content)
+    return {"ok": True}

@@ -1,45 +1,31 @@
-from datetime import datetime
 from pydantic import BaseModel, Field
+from typing import Optional
 
-# --- Schéma de Base (pour la création et la mise à jour) ---
-
+# Schéma de base pour les données que l'utilisateur envoie (POST, PUT)
 class BlocBase(BaseModel):
-    """Schéma de base représentant les données d'un bloc sans l'ID."""
-    
-    titre: str = Field(None, description="Titre du bloc d'événement")
-    
-    heure_debut: datetime = Field(
-        ..., 
-        description="Heure de début du bloc (format ISO 8601)",
-        examples=["2025-12-15T09:00:00"]
-    )
-    heure_fin: datetime = Field(
-        ..., 
-        description="Heure de fin du bloc (format ISO 8601)",
-        examples=["2025-12-15T11:00:00"]
-    )
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "titre": "Réunion Projet IPT",
-                "heure_debut": "2025-12-15T14:00:00",
-                "heure_fin": "2025-12-15T16:00:00"
-            }
-        }
+    nom: str = Field(..., description="Nom du bloc ou ingrédient.")
+    quantite: float = Field(..., description="Quantité du bloc.")
+    unite: str = Field(..., description="Unité de mesure (ex: kg, litre, pièce).")
+    categorie: str = Field(..., description="Catégorie du bloc (ex: Matière première, Produit Fini).")
 
-# --- Schéma Complet (pour la lecture) ---
+# Schéma utilisé pour la CRÉATION d'un bloc (hérite de BlocBase)
+class BlocCreate(BlocBase):
+    pass
 
+# Schéma utilisé pour la MISE À JOUR d'un bloc (rend les champs optionnels)
+class BlocUpdate(BaseModel):
+    nom: Optional[str] = None
+    quantite: Optional[float] = None
+    unite: Optional[str] = None
+    categorie: Optional[str] = None
+
+
+# Schéma utilisé pour la LECTURE d'un bloc (données sortantes)
+# Il inclut l'ID et configure Pydantic pour lire les données des objets SQLAlchemy
 class Bloc(BlocBase):
-    """Schéma complet d'un bloc, incluant l'ID généré automatiquement."""
-    id: int = Field(..., description="ID unique du bloc")
-    
+    id: int
+
     class Config:
-        json_schema_extra = {
-            "example": {
-                "id": 1,
-                "titre": "Développement API FastAPI",
-                "heure_debut": "2025-12-15T09:00:00",
-                "heure_fin": "2025-12-15T11:00:00"
-            }
-        }
+        # Cette configuration est cruciale ! Elle dit à Pydantic de lire les données
+        # des objets ORM (SQLAlchemy) au lieu d'un dictionnaire classique.
+        from_attributes = True
