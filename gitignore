@@ -1,0 +1,17 @@
+# Dossiers et fichiers généraux du système
+.DS_Store
+Thumbs.db
+
+# Environnement virtuel Python
+venv/
+.venv/
+
+# Fichiers de cache Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Fichiers de configuration sensibles
+.env
+instance/
