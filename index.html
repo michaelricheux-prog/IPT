@@ -13,7 +13,7 @@
             background-color: #f4f4f9;
         }
         .container {
-            max-width: 1200px;
+            max-width: 1400px; /* Élargi pour les nouveaux champs */
             margin: auto;
             background: white;
             padding: 20px;
@@ -26,7 +26,7 @@
             border: 1px solid #ddd;
             border-radius: 6px;
         }
-        form input, form button {
+        form input, form button, form select {
             padding: 10px;
             margin-right: 10px;
             margin-bottom: 10px;
@@ -47,12 +47,13 @@
             width: 100%;
             border-collapse: collapse;
             margin-top: 10px;
+            font-size: 0.9em;
         }
         table, th, td {
             border: 1px solid #ddd;
         }
         th, td {
-            padding: 12px;
+            padding: 8px; /* Réduit le padding pour plus de colonnes */
             text-align: left;
         }
         th {
@@ -65,10 +66,6 @@
             border-radius: 6px;
             box-shadow: 0 0 5px rgba(0, 0, 0, 0.05);
         }
-        #gantt-chart svg {
-            width: 100%;
-            height: auto; /* La hauteur sera gérée par la librairie */
-        }
         /* Styles pour les messages de statut */
         #create-status, #patch-status, #get-status {
             padding: 8px;
@@ -80,9 +77,10 @@
             background-color: #f2dede;
             border-color: #ebccd1;
         }
-        /* Masquer la dépendance ID pour l'utilisateur */
-        .hidden-label {
-            display: none;
+        .success {
+            color: #3c763d;
+            background-color: #dff0d8;
+            border-color: #d6e9c6;
         }
     </style>
 </head>
@@ -90,7 +88,6 @@
 
 <div class="container">
     <h1>🏭 Outil de Planification des Opérations (PoC)</h1>
-    <p>Backend: FastAPI | Frontend: HTML/JS/Frappe Gantt | BDD: SQLAlchemy</p>
 
     <div id="gantt-container" class="section">
         <h2>📊 Diagramme de Gantt des Opérations</h2>
@@ -100,12 +97,13 @@
     <div class="section">
         <h2>➕ Créer une nouvelle Opération (POST)</h2>
         <form id="create-form">
-            <input type="text" id="create-nom" placeholder="Nom de l'Opération" required>
-            <input type="number" id="create-quantite" placeholder="Quantité à produire" step="0.01" required>
-            <input type="text" id="create-unite" placeholder="Unité" required>
-            <input type="text" id="create-categorie" placeholder="Catégorie (ex: Montage)" required>
+            <input type="text" id="create-nom" placeholder="Nom Opération/Article" required>
+            <input type="number" id="create-quantite_a_produire" placeholder="Qté à produire" step="0.01">
+            <input type="number" id="create-temps_prevu" placeholder="Temps Prévu (h)" step="0.1">
+            <input type="number" id="create-duree_prevue_semaine" placeholder="Durée Prévue (sem.)" step="0.1">
+            <input type="number" id="create-centre_charge_id" placeholder="Centre Charge ID (Optionnel)">
+            <input type="number" id="create-ordre_fabrication_id" placeholder="OF ID (Optionnel)">
             <br>
-            <label class="hidden-label" for="create-bloc_precedent_id">Dépendance ID:</label>
             <input type="number" id="create-bloc_precedent_id" placeholder="ID Opération Précédente (Optionnel)">
             <button type="submit">Créer l'Opération</button>
         </form>
@@ -113,17 +111,18 @@
     </div>
 
     <div class="section">
-        <h2>✏️ Modifier une Opération (PATCH)</h2>
+        <h2>✏️ Modifier / Clôturer une Opération (PATCH)</h2>
         <form id="update-form">
             <input type="number" id="update-id" placeholder="ID de l'Opération à modifier" required>
-            <input type="text" id="update-nom" placeholder="Nouveau Nom (optionnel)">
-            <input type="number" id="update-quantite" placeholder="Nouvelle Quantité (optionnel)" step="0.01">
-            <input type="text" id="update-unite" placeholder="Nouvelle Unité (optionnel)">
-            <input type="text" id="update-categorie" placeholder="Nouvelle Catégorie (optionnel)">
+            <input type="text" id="update-nom" placeholder="Nouveau Nom (opt.)">
+            <input type="number" id="update-quantite_a_produire" placeholder="Nouvelle Qté à produire (opt.)" step="0.01">
+            <input type="number" id="update-quantite_produite" placeholder="Qté Produite (Clôture)" step="0.01">
+            <input type="number" id="update-temps_prevu" placeholder="Nouveau Temps Prévu (h) (opt.)" step="0.1">
+            <input type="number" id="update-temps_passe" placeholder="Temps Passé (h) (opt.)" step="0.1">
             <br>
             <input type="number" id="update-bloc_precedent_id" placeholder="Nouvel ID Précédent (Dépendance)">
             <label>
-                <input type="checkbox" id="update-est_realisee"> Opération Réalisée ?
+                <input type="checkbox" id="update-est_realisee"> Opération Réalisée / Clôturée ?
             </label>
             <button type="submit">Appliquer les Modifications</button>
         </form>
@@ -138,9 +137,13 @@
                 <tr>
                     <th>ID</th>
                     <th>Nom</th>
-                    <th>Quantité</th>
-                    <th>Unité</th>
-                    <th>Catégorie</th>
+                    <th>OF ID</th>
+                    <th>Qté à Prod.</th>
+                    <th>Qté Prod.</th>
+                    <th>Temps Prévu (h)</th>
+                    <th>Temps Passé (h)</th>
+                    <th>Durée Prévue (sem.)</th>
+                    <th>Centre Charge ID</th>
                     <th>Dépend de (ID)</th>
                     <th>Réalisée</th>
                     <th>Action</th>
@@ -157,13 +160,16 @@
 <script>
     const API_URL = 'http://127.0.0.1:8000/blocs/';
     
+    // Fonction pour convertir les semaines en jours (pour le Gantt)
+    const weeksToDays = (weeks) => Math.ceil(weeks * 7);
+
     // ----------------------------------------------------------------------
     // FONCTION PRINCIPALE : CHARGEMENT ET AFFICHAGE DU GANTT ET DU TABLEAU
     // ----------------------------------------------------------------------
     async function fetchBlocsAndDrawGantt() {
         const tbody = document.querySelector('#blocs-table tbody');
         const statusElement = document.getElementById('get-status');
-        tbody.innerHTML = '<tr><td colspan="8">Chargement...</td></tr>'; // Colspan = 8
+        tbody.innerHTML = '<tr><td colspan="12">Chargement...</td></tr>';
         statusElement.textContent = '';
 
         try {
@@ -173,44 +179,49 @@
             }
             const blocs = await response.json();
             
-            // --- Préparation des données pour le Gantt ---
             let ganttTasks = [];
             let today = new Date();
             tbody.innerHTML = ''; 
 
-            const blocMap = new Map(blocs.map(b => [b.id, b]));
-            
             if (blocs.length === 0) {
-                 tbody.innerHTML = '<tr><td colspan="8">Aucune opération trouvée. Créez-en une !</td></tr>';
+                 tbody.innerHTML = '<tr><td colspan="12">Aucune opération trouvée. Créez-en une !</td></tr>';
             } else {
                 blocs.forEach((bloc, index) => {
-                    // Calcul de la date de début fictive (pour le PoC simple)
-                    let startDay = new Date(today);
-                    // Décale chaque tâche d'un jour pour l'affichage séquentiel
-                    startDay.setDate(today.getDate() + index); 
-                    
                     const formatDate = (date) => date.toISOString().split('T')[0];
                     
-                    // Dépendance : utilise l'ID du bloc précédent (converti en string pour Frappe Gantt)
+                    // --- Logique du Gantt ---
+                    const durationInDays = bloc.duree_prevue_semaine ? weeksToDays(bloc.duree_prevue_semaine) : 1;
+
+                    // Détermination de la date de début (ici, séquentielle simple pour le PoC)
+                    let startDay = new Date(today);
+                    startDay.setDate(today.getDate() + index * durationInDays); 
+                    
+                    let endDay = new Date(startDay);
+                    endDay.setDate(startDay.getDate() + durationInDays); 
+
                     const dependencies = bloc.bloc_precedent_id ? String(bloc.bloc_precedent_id) : '';
                     
                     ganttTasks.push({
                         id: String(bloc.id),
                         name: bloc.nom,
                         start: formatDate(startDay),
-                        end: formatDate(new Date(startDay.getTime() + 86400000)), // Dure 1 jour
+                        end: formatDate(endDay),
                         progress: bloc.est_realisee ? 100 : 0, 
                         dependencies: dependencies,
                         custom_class: bloc.est_realisee ? 'gantt-completed' : 'gantt-pending'
                     });
 
-                    // Mise à jour du tableau standard
+                    // --- Mise à jour du tableau ---
                     const row = tbody.insertRow();
                     row.insertCell().textContent = bloc.id;
                     row.insertCell().textContent = bloc.nom;
-                    row.insertCell().textContent = bloc.quantite;
-                    row.insertCell().textContent = bloc.unite;
-                    row.insertCell().textContent = bloc.categorie;
+                    row.insertCell().textContent = bloc.ordre_fabrication_id || 'N/A';
+                    row.insertCell().textContent = bloc.quantite_a_produire || 0;
+                    row.insertCell().textContent = bloc.quantite_produite || 0;
+                    row.insertCell().textContent = bloc.temps_prevu || 'N/A';
+                    row.insertCell().textContent = bloc.temps_passe || 0;
+                    row.insertCell().textContent = bloc.duree_prevue_semaine || 0;
+                    row.insertCell().textContent = bloc.centre_charge_id || 'N/A';
                     row.insertCell().textContent = bloc.bloc_precedent_id || 'N/A';
                     row.insertCell().textContent = bloc.est_realisee ? '✅ Oui' : '❌ Non';
 
@@ -228,20 +239,15 @@
             // --- Initialisation du Gantt ---
             const ganttElement = document.getElementById('gantt-chart');
             if (ganttTasks.length > 0) {
-                 // S'assure de nettoyer avant de recréer
                 ganttElement.innerHTML = ''; 
                 new Gantt(ganttElement, ganttTasks, {
-                    header_height: 50,
-                    column_width: 30,
-                    step: 24, // 1 jour
                     view_modes: ['Day', 'Week', 'Month'],
-                    bar_height: 20,
-                    padding: 18,
                     view_mode: 'Week',
                     language: 'fr',
                     custom_popup_html: function(task) {
                         return `<div class="details-container">
                             <h5>${task.name} (ID: ${task.id})</h5>
+                            <p>OF: ${blocs.find(b => String(b.id) === task.id).ordre_fabrication_id || 'N/A'}</p>
                             <p>Dépend de: ${task.dependencies || 'Aucune'}</p>
                             <p>Statut: ${task.progress === 100 ? 'Terminée' : 'En attente'}</p>
                         </div>`;
@@ -268,6 +274,7 @@
     async function populateUpdateForm(id) {
         const statusElement = document.getElementById('patch-status');
         statusElement.textContent = `Chargement du bloc ID ${id}...`;
+        statusElement.className = '';
 
         try {
             const response = await fetch(`${API_URL}${id}`);
@@ -278,16 +285,19 @@
 
             // Remplissage des champs du formulaire de modification
             document.getElementById('update-id').value = bloc.id;
-            document.getElementById('update-nom').value = bloc.nom;
-            document.getElementById('update-quantite').value = bloc.quantite;
-            document.getElementById('update-unite').value = bloc.unite;
-            document.getElementById('update-categorie').value = bloc.categorie;
+            document.getElementById('update-nom').value = bloc.nom || '';
+            document.getElementById('update-quantite_a_produire').value = bloc.quantite_a_produire || '';
+            document.getElementById('update-quantite_produite').value = bloc.quantite_produite || '';
+            document.getElementById('update-temps_prevu').value = bloc.temps_prevu || '';
+            document.getElementById('update-temps_passe').value = bloc.temps_passe || '';
             document.getElementById('update-bloc_precedent_id').value = bloc.bloc_precedent_id || '';
             document.getElementById('update-est_realisee').checked = bloc.est_realisee;
 
-            statusElement.textContent = `Bloc ID ${id} sélectionné. Modifiez les champs ci-dessus.`;
+            statusElement.className = 'success';
+            statusElement.textContent = `Opération ID ${id} sélectionnée. Modifiez les champs ci-dessus.`;
 
         } catch (error) {
+            statusElement.className = '';
             statusElement.textContent = `Erreur lors du chargement du bloc ID ${id}: ${error.message}`;
         }
     }
@@ -296,16 +306,21 @@
     document.getElementById('create-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const statusElement = document.getElementById('create-status');
+        statusElement.className = '';
         
-        const bloc_precedent_id_val = document.getElementById('create-bloc_precedent_id').value;
+        const getVal = (id) => document.getElementById(id).value;
+        const getInt = (id) => getVal(id) ? parseInt(getVal(id)) : null;
+        const getFloat = (id) => getVal(id) ? parseFloat(getVal(id)) : null;
 
         const newBloc = {
-            nom: document.getElementById('create-nom').value,
-            quantite: parseFloat(document.getElementById('create-quantite').value),
-            unite: document.getElementById('create-unite').value,
-            categorie: document.getElementById('create-categorie').value,
-            // N'envoie le champ que s'il y a une valeur
-            bloc_precedent_id: bloc_precedent_id_val ? parseInt(bloc_precedent_id_val) : null 
+            nom: getVal('create-nom'),
+            quantite_a_produire: getFloat('create-quantite_a_produire'),
+            temps_prevu: getFloat('create-temps_prevu'),
+            duree_prevue_semaine: getFloat('create-duree_prevue_semaine'),
+            centre_charge_id: getInt('create-centre_charge_id'),
+            ordre_fabrication_id: getInt('create-ordre_fabrication_id'),
+            bloc_precedent_id: getInt('create-bloc_precedent_id')
+            // Les champs non envoyés (quantite_produite, temps_passe) utiliseront les valeurs par défaut du Backend (0.0)
         };
 
         try {
@@ -318,19 +333,17 @@
             });
 
             if (response.status === 201) {
+                statusElement.className = 'success';
                 statusElement.textContent = `Opération '${newBloc.nom}' créée avec succès !`;
                 document.getElementById('create-form').reset();
                 fetchBlocsAndDrawGantt(); 
             } else {
                  const errorData = await response.json();
-                 // Capture les erreurs de type 400 (cycle) du Backend
-                if (response.status === 400 && errorData.detail) {
-                    statusElement.textContent = `🚫 ERREUR DE RÈGLE MÉTIER : ${errorData.detail}`;
-                } else {
-                    statusElement.textContent = `Échec de la création: ${errorData.detail || response.statusText}`;
-                }
+                statusElement.className = '';
+                statusElement.textContent = `🚫 ERREUR : ${errorData.detail || response.statusText}`;
             }
         } catch (error) {
+            statusElement.className = '';
             statusElement.textContent = `Erreur réseau : Impossible de contacter l'API.`;
         }
     });
@@ -339,30 +352,30 @@
     document.getElementById('update-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const statusElement = document.getElementById('patch-status');
-        statusElement.style.color = '#d9534f'; // Rétablir la couleur d'erreur par défaut
+        statusElement.className = '';
         
         const blocId = document.getElementById('update-id').value;
-
-        const updateData = {};
-        const nom = document.getElementById('update-nom').value;
-        const quantite = document.getElementById('update-quantite').value;
-        const unite = document.getElementById('update-unite').value;
-        const categorie = document.getElementById('update-categorie').value;
-        const bloc_precedent_id_val = document.getElementById('update-bloc_precedent_id').value;
-        const est_realisee = document.getElementById('update-est_realisee').checked;
-
-        if (nom) updateData.nom = nom;
-        if (quantite) updateData.quantite = parseFloat(quantite);
-        if (unite) updateData.unite = unite;
-        if (categorie) updateData.categorie = categorie;
+        const getVal = (id) => document.getElementById(id).value;
         
-        // Ajout des nouveaux champs s'ils ont été saisis/cochés
-        if (bloc_precedent_id_val !== '') {
-            updateData.bloc_precedent_id = bloc_precedent_id_val ? parseInt(bloc_precedent_id_val) : null;
-        }
+        const updateData = {};
+        
+        // Fonction pour ajouter une valeur au payload seulement si le champ n'est pas vide
+        const addIfPresent = (key, id, type) => {
+            const val = getVal(id);
+            if (val !== null && val !== '') {
+                updateData[key] = (type === 'int') ? parseInt(val) : (type === 'float' ? parseFloat(val) : val);
+            }
+        };
 
-        // Le champ est_realisee est toujours envoyé si la case est présente
-        updateData.est_realisee = est_realisee;
+        addIfPresent('nom', 'update-nom');
+        addIfPresent('quantite_a_produire', 'update-quantite_a_produire', 'float');
+        addIfPresent('quantite_produite', 'update-quantite_produite', 'float');
+        addIfPresent('temps_prevu', 'update-temps_prevu', 'float');
+        addIfPresent('temps_passe', 'update-temps_passe', 'float');
+        addIfPresent('bloc_precedent_id', 'update-bloc_precedent_id', 'int');
+        
+        // Le champ est_realisee est toujours envoyé car il est critique pour la clôture
+        updateData.est_realisee = document.getElementById('update-est_realisee').checked;
         
         if (Object.keys(updateData).length === 0) {
             statusElement.textContent = "Veuillez remplir au moins un champ de modification.";
@@ -380,22 +393,18 @@
 
             if (response.ok) {
                 const updatedBloc = await response.json();
-                statusElement.style.color = '#5cb85c'; // Couleur verte pour le succès
+                statusElement.className = 'success';
                 statusElement.textContent = `Opération ID ${blocId} modifiée avec succès ! (Nom: ${updatedBloc.nom})`;
                 document.getElementById('update-form').reset();
                 fetchBlocsAndDrawGantt(); 
             } else {
                 const errorData = await response.json();
-                
-                // --- GESTION DE L'ERREUR 400 (Cycle) ---
-                if (response.status === 400 && errorData.detail) {
-                    statusElement.textContent = `🚫 ERREUR DE RÈGLE MÉTIER : ${errorData.detail}`;
-                } else {
-                    statusElement.textContent = `Échec de la modification: ${errorData.detail || response.statusText}`;
-                }
+                statusElement.className = '';
+                statusElement.textContent = `🚫 ERREUR DE RÈGLE MÉTIER : ${errorData.detail || response.statusText}`;
             }
 
         } catch (error) {
+            statusElement.className = '';
             statusElement.textContent = `Erreur réseau : Impossible de contacter l'API pour la mise à jour.`;
         }
     });

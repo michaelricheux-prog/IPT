@@ -1,12 +1,22 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 
-# Schéma de base pour les données que l'utilisateur envoie (POST, PUT)
+# Schéma de base pour les données que l'utilisateur envoie
 class BlocBase(BaseModel):
-    nom: str = Field(..., description="Nom du bloc ou ingrédient.")
-    quantite: float = Field(..., description="Quantité du bloc.")
-    unite: str = Field(..., description="Unité de mesure (ex: kg, litre, pièce).")
-    categorie: str = Field(..., description="Catégorie du bloc (ex: Matière première, Produit Fini).")
+    nom: str = Field(..., description="Nom de l'Opération / Gamme.")
+
+    # NOUVEAUX CHAMPS
+    quantite_a_produire: Optional[float] = 0.0
+    quantite_produite: Optional[float] = 0.0
+    temps_prevu: Optional[float] = None
+    temps_passe: Optional[float] = 0.0
+    duree_prevue_semaine: Optional[float] = None
+    centre_charge_id: Optional[int] = None
+    ordre_fabrication_id: Optional[int] = None
+
+    # Champs de Planification existants
+    est_realisee: Optional[bool] = False 
+    bloc_precedent_id: Optional[int] = None 
 
 # Schéma utilisé pour la CRÉATION d'un bloc (hérite de BlocBase)
 class BlocCreate(BlocBase):
@@ -15,9 +25,15 @@ class BlocCreate(BlocBase):
 # Schéma utilisé pour la MISE À JOUR d'un bloc (rend les champs optionnels)
 class BlocUpdate(BaseModel):
     nom: Optional[str] = None
-    quantite: Optional[float] = None
-    unite: Optional[str] = None
-    categorie: Optional[str] = None
+    quantite_a_produire: Optional[float] = None
+    quantite_produite: Optional[float] = None
+    temps_prevu: Optional[float] = None
+    temps_passe: Optional[float] = None
+    duree_prevue_semaine: Optional[float] = None
+    centre_charge_id: Optional[int] = None
+    ordre_fabrication_id: Optional[int] = None
+    est_realisee: Optional[bool] = None
+    bloc_precedent_id: Optional[int] = None
 
 
 # Schéma utilisé pour la LECTURE d'un bloc (données sortantes)
@@ -26,6 +42,4 @@ class Bloc(BlocBase):
     id: int
 
     class Config:
-        # Cette configuration est cruciale ! Elle dit à Pydantic de lire les données
-        # des objets ORM (SQLAlchemy) au lieu d'un dictionnaire classique.
-        from_attributes = True
+        orm_mode = True

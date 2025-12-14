@@ -2,33 +2,24 @@ from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List
-from fastapi.middleware.cors import CORSMiddleware
 
 # Importations des fichiers locaux pour la BDD et les schémas
 from . import models, schemas
 from .database import engine, get_db
-from .models import Bloc
+from .models import Bloc # Importation spécifique pour la clarté
 
 # Crée les tables dans la base de données (si elles n'existent pas)
-# C'est ce qui génère le fichier sqlite.db au démarrage
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-# Middleware CORS : autorise les requêtes depuis le frontend (adapter allow_origins en prod)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # <-- changer pour autoriser uniquement vos domaines en production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 # Configuration CORS (permet au frontend d'accéder à l'API)
 origins = [
     "http://localhost",
     "http://localhost:8000",
     # Ajoutez l'origine "null" pour autoriser l'accès depuis le fichier local index.html
     "null", 
+    "*", # Le wildcard est souvent utilisé en PoC mais à limiter en production
 ]
 
 app.add_middleware(
@@ -44,23 +35,25 @@ app.add_middleware(
 def is_cyclic_dependency(db: Session, bloc_id: int, depend_on_id: int) -> bool:
     """
     Vérifie si la dépendance (bloc_id -> depend_on_id) crée un cycle.
+    
+    bloc_id: L'ID du bloc que l'on est en train de modifier/créer.
+    depend_on_id: L'ID du bloc dont 'bloc_id' veut dépendre.
     """
+    # 1. Un bloc ne peut pas dépendre de lui-même
     if bloc_id == depend_on_id:
-        # Un bloc ne peut pas dépendre de lui-même
         return True
 
     current_id = depend_on_id
 
-    # Parcourir la chaîne de dépendances à partir du bloc prédécesseur
+    # 2. Parcourir la chaîne de dépendances à partir du bloc prédécesseur
     while current_id is not None:
-        # Trouver l'objet bloc dans la BDD
         db_bloc = db.query(models.Bloc).filter(models.Bloc.id == current_id).first()
 
         if db_bloc is None:
-            # La dépendance pointe vers un bloc inexistant (ce n'est pas un cycle, mais c'est une erreur que nous pourrions gérer plus tard)
+            # La dépendance pointe vers un bloc inexistant
             return False 
 
-        # Si nous retombons sur le bloc original, il y a un cycle !
+        # Si nous retombons sur le bloc original (bloc_id), il y a un cycle !
         if db_bloc.bloc_precedent_id == bloc_id:
             return True 
 
@@ -74,18 +67,12 @@ def is_cyclic_dependency(db: Session, bloc_id: int, depend_on_id: int) -> bool:
 # ----------------------------------------------------------------------
 
 # 1. CRÉER un nouveau bloc (POST)
-# Utilise get_db() pour obtenir une session de BDD
 @app.post("/blocs/", response_model=schemas.Bloc, status_code=status.HTTP_201_CREATED)
 def create_bloc(bloc: schemas.BlocCreate, db: Session = Depends(get_db)):
 
-    # 1. Gestion de la Dépendance Circulaire
+    # Gestion de la Dépendance Circulaire (Utilisation de db.flush pour obtenir l'ID)
     if bloc.bloc_precedent_id is not None:
-
-        # Nous devons d'abord créer le bloc pour obtenir son ID
-        # HACK: Pour la création, nous utilisons temporairement une vérification simple sur l'ID du prédécesseur,
-        # car nous n'avons pas encore l'ID du nouveau bloc. 
-        # Pour la VRAIE robustesse, cette logique devrait être déplacée dans un service.
-
+        
         db_bloc = models.Bloc(**bloc.dict())
         db.add(db_bloc)
         db.flush() # Flusher donne l'ID au db_bloc SANS commiter
@@ -114,7 +101,6 @@ def read_blocs(db: Session = Depends(get_db)):
     """
     Récupère la liste complète de tous les blocs.
     """
-    # Interroge la BDD pour obtenir tous les blocs
     blocs = db.query(models.Bloc).all()
     return blocs
 
@@ -124,7 +110,6 @@ def read_bloc(bloc_id: int, db: Session = Depends(get_db)):
     """
     Récupère un bloc spécifique basé sur son ID.
     """
-    # Interroge la BDD pour obtenir un bloc par ID
     db_bloc = db.query(models.Bloc).filter(models.Bloc.id == bloc_id).first()
     
     if db_bloc is None:
@@ -142,20 +127,59 @@ def update_bloc(bloc_id: int, bloc: schemas.BlocUpdate, db: Session = Depends(ge
 
     update_data = bloc.dict(exclude_unset=True)
 
-    # 1. Gestion de la Dépendance Circulaire LORS DE LA MODIFICATION
+    # 1. Gestion de la Dépendance Circulaire
     if 'bloc_precedent_id' in update_data and update_data['bloc_precedent_id'] is not None:
         new_predecessor_id = update_data['bloc_precedent_id']
 
         if is_cyclic_dependency(db, bloc_id, new_predecessor_id):
-             raise HTTPException(
+            raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Dépendance circulaire détectée : Le bloc {new_predecessor_id} dépend déjà (directement ou indirectement) du bloc {bloc_id}."
             )
 
-    # 2. Application des changements si pas de cycle
+    # 2. 🛡️ Validation de l'état du prédécesseur avant de réaliser la tâche
+    if 'est_realisee' in update_data and update_data['est_realisee'] is True:
+
+        # Déterminer l'ID du prédécesseur (utilise le nouveau si fourni, sinon l'actuel)
+        predecessor_id_to_check = update_data.get('bloc_precedent_id') or db_bloc.bloc_precedent_id
+
+        if predecessor_id_to_check:
+            db_predecessor = db.query(models.Bloc).filter(models.Bloc.id == predecessor_id_to_check).first()
+
+            # Vérification 1: Le prédécesseur doit exister
+            if not db_predecessor:
+                raise HTTPException(
+                     status_code=status.HTTP_400_BAD_REQUEST,
+                     detail=f"Opération précédente (ID {predecessor_id_to_check}) non trouvée."
+                 )
+
+            # Vérification 2: Le prédécesseur doit être réalisé
+            if db_predecessor.est_realisee is False:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"L'opération précédente (ID {predecessor_id_to_check}, Nom: {db_predecessor.nom}) doit être réalisée avant de pouvoir marquer l'opération actuelle comme terminée."
+                )
+
+    # 3. 🛡️ Validation des quantités pour la clôture (uniquement si on tente de clore)
+    if 'est_realisee' in update_data and update_data['est_realisee'] is True:
+        
+        # Récupérer la quantité_a_produire (prend la nouvelle valeur si fournie, sinon l'ancienne)
+        required_qty = update_data.get('quantite_a_produire') if 'quantite_a_produire' in update_data else db_bloc.quantite_a_produire
+        
+        # Récupérer la quantité_produite (prend la nouvelle valeur si fournie, sinon l'ancienne)
+        produced_qty = update_data.get('quantite_produite') if 'quantite_produite' in update_data else db_bloc.quantite_produite
+
+        # La règle de clôture : la quantité produite doit être atteinte
+        if produced_qty < required_qty:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Impossible de clôre l'opération : Quantité produite ({produced_qty}) inférieure à la quantité requise ({required_qty})."
+            )
+
+    # 4. ✅ APPLICATION DES CHANGEMENTS FINALE ET COMMITS
     for key, value in update_data.items():
         setattr(db_bloc, key, value)
-
+        
     db.add(db_bloc)
     db.commit()
     db.refresh(db_bloc)
@@ -167,18 +191,12 @@ def delete_bloc(bloc_id: int, db: Session = Depends(get_db)):
     """
     Supprime un bloc de la base de données.
     """
-    # 1. Trouver le bloc
     db_bloc = db.query(models.Bloc).filter(models.Bloc.id == bloc_id).first()
     
     if db_bloc is None:
         raise HTTPException(status_code=404, detail="Bloc non trouvé")
     
-    # 2. Supprimer l'objet
     db.delete(db_bloc)
     db.commit()
     
-    # 3. Retourner une réponse de succès (204 No Content)
     return {"ok": True}
-
-
-
