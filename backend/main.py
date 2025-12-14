@@ -13,6 +13,10 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
+@app.get("/")
+def read_root():
+    return {"Hello": "API is running"}
+
 # Configuration CORS (permet au frontend d'accéder à l'API)
 origins = [
     "http://localhost",
