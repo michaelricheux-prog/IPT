@@ -9,7 +9,7 @@ from .database import engine, get_db
 from .models import Bloc # Importation spécifique pour la clarté
 
 # Crée les tables dans la base de données (si elles n'existent pas)
-models.Base.metadata.create_all(bind=engine)
+# models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
