@@ -1,3 +1,4 @@
+from datetime import datetime
 from pydantic import BaseModel, Field
 from typing import Optional
 
@@ -40,6 +41,11 @@ class BlocUpdate(BaseModel):
 # Il inclut l'ID et configure Pydantic pour lire les données des objets SQLAlchemy
 class Bloc(BlocBase):
     id: int
+    
+    # 🔵 Dates planifiées en sortie
+    date_debut_planifiee: Optional[datetime] = None
+    date_fin_planifiee: Optional[datetime] = None
 
     class Config:
         orm_mode = True
+

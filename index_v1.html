@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>PoC Planification des Opérations (FastAPI + Gantt)</title>
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.css" />
+    
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f9;
+        }
+        .container {
+            max-width: 1400px; /* Élargi pour les nouveaux champs */
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+        }
+        form input, form button, form select {
+            padding: 10px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        form button {
+            cursor: pointer;
+            background-color: #5cb85c;
+            color: white;
+            border: none;
+            transition: background-color 0.3s;
+        }
+        form button:hover {
+            background-color: #4cae4c;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 8px; /* Réduit le padding pour plus de colonnes */
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        /* Style pour le Gantt (Frappe Gantt) */
+        #gantt-container { 
+            margin-top: 20px; 
+            background: #ffffff;
+            border-radius: 6px;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.05);
+        }
+        /* Styles pour les messages de statut */
+        #create-status, #patch-status, #get-status {
+            padding: 8px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        #patch-status {
+            color: #d9534f;
+            background-color: #f2dede;
+            border-color: #ebccd1;
+        }
+        .success {
+            color: #3c763d;
+            background-color: #dff0d8;
+            border-color: #d6e9c6;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🏭 Outil de Planification des Opérations (PoC)</h1>
+
+    <div id="gantt-container" class="section">
+        <h2>📊 Diagramme de Gantt des Opérations</h2>
+        <svg id="gantt-chart"></svg>
+    </div>
+
+    <div class="section">
+        <h2>➕ Créer une nouvelle Opération (POST)</h2>
+        <form id="create-form">
+            <input type="text" id="create-nom" placeholder="Nom Opération/Article" required>
+            <input type="number" id="create-quantite_a_produire" placeholder="Qté à produire" step="0.01">
+            <input type="number" id="create-temps_prevu" placeholder="Temps Prévu (h)" step="0.1">
+            <input type="number" id="create-duree_prevue_semaine" placeholder="Durée Prévue (sem.)" step="0.1">
+            <input type="number" id="create-centre_charge_id" placeholder="Centre Charge ID (Optionnel)">
+            <input type="number" id="create-ordre_fabrication_id" placeholder="OF ID (Optionnel)">
+            <br>
+            <input type="number" id="create-bloc_precedent_id" placeholder="ID Opération Précédente (Optionnel)">
+            <button type="submit">Créer l'Opération</button>
+        </form>
+        <p id="create-status"></p>
+    </div>
+
+    <div class="section">
+        <h2>✏️ Modifier / Clôturer une Opération (PATCH)</h2>
+        <form id="update-form">
+            <input type="number" id="update-id" placeholder="ID de l'Opération à modifier" required>
+            <input type="text" id="update-nom" placeholder="Nouveau Nom (opt.)">
+            <input type="number" id="update-quantite_a_produire" placeholder="Nouvelle Qté à produire (opt.)" step="0.01">
+            <input type="number" id="update-quantite_produite" placeholder="Qté Produite (Clôture)" step="0.01">
+            <input type="number" id="update-temps_prevu" placeholder="Nouveau Temps Prévu (h) (opt.)" step="0.1">
+            <input type="number" id="update-temps_passe" placeholder="Temps Passé (h) (opt.)" step="0.1">
+            <br>
+            <input type="number" id="update-bloc_precedent_id" placeholder="Nouvel ID Précédent (Dépendance)">
+            <label>
+                <input type="checkbox" id="update-est_realisee"> Opération Réalisée / Clôturée ?
+            </label>
+            <button type="submit">Appliquer les Modifications</button>
+        </form>
+        <p id="patch-status"></p>
+    </div>
+
+    <div class="section">
+        <h2>📋 Liste des Opérations (GET)</h2>
+        <p id="get-status"></p>
+        <table id="blocs-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nom</th>
+                    <th>OF ID</th>
+                    <th>Qté à Prod.</th>
+                    <th>Qté Prod.</th>
+                    <th>Temps Prévu (h)</th>
+                    <th>Temps Passé (h)</th>
+                    <th>Durée Prévue (sem.)</th>
+                    <th>Centre Charge ID</th>
+                    <th>Dépend de (ID)</th>
+                    <th>Réalisée</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.js"></script>
+
+<script>
+    const API_URL = 'http://127.0.0.1:8000/blocs/';
+    //const API_URL = 'https://ipt-3gj1.onrender.com/blocs/';
+
+    // Fonction pour convertir les semaines en jours (pour le Gantt)
+    const weeksToDays = (weeks) => Math.ceil(weeks * 7);
+
+    // ----------------------------------------------------------------------
+    // FONCTION PRINCIPALE : CHARGEMENT ET AFFICHAGE DU GANTT ET DU TABLEAU
+    // ----------------------------------------------------------------------
+    async function fetchBlocsAndDrawGantt() {
+        const tbody = document.querySelector('#blocs-table tbody');
+        const statusElement = document.getElementById('get-status');
+        tbody.innerHTML = '<tr><td colspan="12">Chargement...</td></tr>';
+        statusElement.textContent = '';
+
+        try {
+            const response = await fetch(API_URL);
+            if (!response.ok) {
+                throw new Error(`Erreur HTTP: ${response.status}`);
+            }
+            const blocs = await response.json();
+            
+            let ganttTasks = [];
+            let today = new Date();
+            tbody.innerHTML = ''; 
+
+            if (blocs.length === 0) {
+                 tbody.innerHTML = '<tr><td colspan="12">Aucune opération trouvée. Créez-en une !</td></tr>';
+            } else {
+                blocs.forEach((bloc, index) => {
+                    const formatDate = (date) => date.toISOString().split('T')[0];
+                    
+                    // --- Logique du Gantt ---
+                    const durationInDays = bloc.duree_prevue_semaine ? weeksToDays(bloc.duree_prevue_semaine) : 1;
+
+                    // Détermination de la date de début (ici, séquentielle simple pour le PoC)
+                    let startDay = new Date(today);
+                    startDay.setDate(today.getDate() + index * durationInDays); 
+                    
+                    let endDay = new Date(startDay);
+                    endDay.setDate(startDay.getDate() + durationInDays); 
+
+                    const dependencies = bloc.bloc_precedent_id ? String(bloc.bloc_precedent_id) : '';
+                    
+                    ganttTasks.push({
+                        id: String(bloc.id),
+                        name: bloc.nom,
+                        start: formatDate(startDay),
+                        end: formatDate(endDay),
+                        progress: bloc.est_realisee ? 100 : 0, 
+                        dependencies: dependencies,
+                        custom_class: bloc.est_realisee ? 'gantt-completed' : 'gantt-pending'
+                    });
+
+                    // --- Mise à jour du tableau ---
+                    const row = tbody.insertRow();
+                    row.insertCell().textContent = bloc.id;
+                    row.insertCell().textContent = bloc.nom;
+                    row.insertCell().textContent = bloc.ordre_fabrication_id || 'N/A';
+                    row.insertCell().textContent = bloc.quantite_a_produire || 0;
+                    row.insertCell().textContent = bloc.quantite_produite || 0;
+                    row.insertCell().textContent = bloc.temps_prevu || 'N/A';
+                    row.insertCell().textContent = bloc.temps_passe || 0;
+                    row.insertCell().textContent = bloc.duree_prevue_semaine || 0;
+                    row.insertCell().textContent = bloc.centre_charge_id || 'N/A';
+                    row.insertCell().textContent = bloc.bloc_precedent_id || 'N/A';
+                    row.insertCell().textContent = bloc.est_realisee ? '✅ Oui' : '❌ Non';
+
+                    // Crée le bouton d'action
+                    const actionCell = row.insertCell();
+                    const selectButton = document.createElement('button');
+                    selectButton.textContent = 'Sélectionner';
+                    selectButton.onclick = () => populateUpdateForm(bloc.id); 
+                    selectButton.style.padding = '5px';
+                    selectButton.style.width = 'auto';
+                    actionCell.appendChild(selectButton);
+                });
+            }
+
+            // --- Initialisation du Gantt ---
+            const ganttElement = document.getElementById('gantt-chart');
+            if (ganttTasks.length > 0) {
+                ganttElement.innerHTML = ''; 
+                new Gantt(ganttElement, ganttTasks, {
+                    view_modes: ['Day', 'Week', 'Month'],
+                    view_mode: 'Week',
+                    language: 'fr',
+                    custom_popup_html: function(task) {
+                        return `<div class="details-container">
+                            <h5>${task.name} (ID: ${task.id})</h5>
+                            <p>OF: ${blocs.find(b => String(b.id) === task.id).ordre_fabrication_id || 'N/A'}</p>
+                            <p>Dépend de: ${task.dependencies || 'Aucune'}</p>
+                            <p>Statut: ${task.progress === 100 ? 'Terminée' : 'En attente'}</p>
+                        </div>`;
+                    }
+                });
+            } else {
+                ganttElement.innerHTML = "<p>Aucune opération à afficher dans le Gantt.</p>";
+            }
+            
+            statusElement.textContent = `Liste et Gantt chargés (${blocs.length} éléments)`;
+            
+        } catch (error) {
+            statusElement.textContent = `Erreur de connexion : ${error.message}. Vérifiez si l'API est lancée !`;
+            document.getElementById('gantt-chart').innerHTML = "<p>Erreur lors du chargement des données pour le Gantt.</p>";
+        }
+    }
+
+
+    // ----------------------------------------------------------------------
+    // GESTIONNAIRES DE FORMULAIRES
+    // ----------------------------------------------------------------------
+
+    // Fonction pour pré-remplir le formulaire de modification (Sélectionner)
+    async function populateUpdateForm(id) {
+        const statusElement = document.getElementById('patch-status');
+        statusElement.textContent = `Chargement du bloc ID ${id}...`;
+        statusElement.className = '';
+
+        try {
+            const response = await fetch(`${API_URL}${id}`);
+            if (!response.ok) {
+                throw new Error(`Erreur HTTP: ${response.status}`);
+            }
+            const bloc = await response.json();
+
+            // Remplissage des champs du formulaire de modification
+            document.getElementById('update-id').value = bloc.id;
+            document.getElementById('update-nom').value = bloc.nom || '';
+            document.getElementById('update-quantite_a_produire').value = bloc.quantite_a_produire || '';
+            document.getElementById('update-quantite_produite').value = bloc.quantite_produite || '';
+            document.getElementById('update-temps_prevu').value = bloc.temps_prevu || '';
+            document.getElementById('update-temps_passe').value = bloc.temps_passe || '';
+            document.getElementById('update-bloc_precedent_id').value = bloc.bloc_precedent_id || '';
+            document.getElementById('update-est_realisee').checked = bloc.est_realisee;
+
+            statusElement.className = 'success';
+            statusElement.textContent = `Opération ID ${id} sélectionnée. Modifiez les champs ci-dessus.`;
+
+        } catch (error) {
+            statusElement.className = '';
+            statusElement.textContent = `Erreur lors du chargement du bloc ID ${id}: ${error.message}`;
+        }
+    }
+
+    // Gestion de la CRÉATION (POST)
+    document.getElementById('create-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const statusElement = document.getElementById('create-status');
+        statusElement.className = '';
+        
+        const getVal = (id) => document.getElementById(id).value;
+        const getInt = (id) => getVal(id) ? parseInt(getVal(id)) : null;
+        const getFloat = (id) => getVal(id) ? parseFloat(getVal(id)) : null;
+
+        const newBloc = {
+            nom: getVal('create-nom'),
+            quantite_a_produire: getFloat('create-quantite_a_produire'),
+            temps_prevu: getFloat('create-temps_prevu'),
+            duree_prevue_semaine: getFloat('create-duree_prevue_semaine'),
+            centre_charge_id: getInt('create-centre_charge_id'),
+            ordre_fabrication_id: getInt('create-ordre_fabrication_id'),
+            bloc_precedent_id: getInt('create-bloc_precedent_id')
+            // Les champs non envoyés (quantite_produite, temps_passe) utiliseront les valeurs par défaut du Backend (0.0)
+        };
+
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(newBloc)
+            });
+
+            if (response.status === 201) {
+                statusElement.className = 'success';
+                statusElement.textContent = `Opération '${newBloc.nom}' créée avec succès !`;
+                document.getElementById('create-form').reset();
+                fetchBlocsAndDrawGantt(); 
+            } else {
+                 const errorData = await response.json();
+                statusElement.className = '';
+                statusElement.textContent = `🚫 ERREUR : ${errorData.detail || response.statusText}`;
+            }
+        } catch (error) {
+            statusElement.className = '';
+            statusElement.textContent = `Erreur réseau : Impossible de contacter l'API.`;
+        }
+    });
+
+    // Gestion de la MODIFICATION (PATCH)
+    document.getElementById('update-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const statusElement = document.getElementById('patch-status');
+        statusElement.className = '';
+        
+        const blocId = document.getElementById('update-id').value;
+        const getVal = (id) => document.getElementById(id).value;
+        
+        const updateData = {};
+        
+        // Fonction pour ajouter une valeur au payload seulement si le champ n'est pas vide
+        const addIfPresent = (key, id, type) => {
+            const val = getVal(id);
+            if (val !== null && val !== '') {
+                updateData[key] = (type === 'int') ? parseInt(val) : (type === 'float' ? parseFloat(val) : val);
+            }
+        };
+
+        addIfPresent('nom', 'update-nom');
+        addIfPresent('quantite_a_produire', 'update-quantite_a_produire', 'float');
+        addIfPresent('quantite_produite', 'update-quantite_produite', 'float');
+        addIfPresent('temps_prevu', 'update-temps_prevu', 'float');
+        addIfPresent('temps_passe', 'update-temps_passe', 'float');
+        addIfPresent('bloc_precedent_id', 'update-bloc_precedent_id', 'int');
+        
+        // Le champ est_realisee est toujours envoyé car il est critique pour la clôture
+        updateData.est_realisee = document.getElementById('update-est_realisee').checked;
+        
+        if (Object.keys(updateData).length === 0) {
+            statusElement.textContent = "Veuillez remplir au moins un champ de modification.";
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_URL}${blocId}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(updateData)
+            });
+
+            if (response.ok) {
+                const updatedBloc = await response.json();
+                statusElement.className = 'success';
+                statusElement.textContent = `Opération ID ${blocId} modifiée avec succès ! (Nom: ${updatedBloc.nom})`;
+                document.getElementById('update-form').reset();
+                fetchBlocsAndDrawGantt(); 
+            } else {
+                const errorData = await response.json();
+                statusElement.className = '';
+                statusElement.textContent = `🚫 ERREUR DE RÈGLE MÉTIER : ${errorData.detail || response.statusText}`;
+            }
+
+        } catch (error) {
+            statusElement.className = '';
+            statusElement.textContent = `Erreur réseau : Impossible de contacter l'API pour la mise à jour.`;
+        }
+    });
+
+    // Charger la liste et le Gantt au chargement de la page
+    document.addEventListener('DOMContentLoaded', fetchBlocsAndDrawGantt);
+</script>
+
+</body>
+</html>

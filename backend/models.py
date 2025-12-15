@@ -61,6 +61,10 @@ class Bloc(Base):
     # CHAMPS DE PLANIFICATION
     est_realisee = Column(Boolean, default=False)
 
+    # 🔵 Nouvelles dates planifiées
+    date_debut_planifiee = Column(DateTime, nullable=True)
+    date_fin_planifiee   = Column(DateTime, nullable=True)
+
     # Dépendance sur un autre Bloc
     bloc_precedent_id = Column(Integer, ForeignKey('blocs.id'), nullable=True) 
 

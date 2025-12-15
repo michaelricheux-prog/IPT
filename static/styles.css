@@ -1,0 +1,138 @@
+
+/* ===== Thème & base ===== */
+:root {
+  --bg:#0f172a;        /* slate-900 */
+  --panel:#111827;     /* gray-900 */
+  --text:#e5e7eb;      /* gray-200 */
+  --muted:#9ca3af;     /* gray-400 */
+  --border:#1f2937;    /* gray-800 */
+  --accent:#3b82f6;    /* blue-500 */
+  --ok:#10b981;        /* emerald-500 */
+  --err:#ef4444;       /* red-500 */
+}
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+/* ===== Layout & composants ===== */
+main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 18px;
+  display: grid;
+  gap: 18px;
+}
+
+h1, hh1, h2, h3 { margin: 8px 0 12px 0; }
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin: 8px 0;
+}
+
+label {
+  font-size: .9rem;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+input, select, button {
+  background: #0b1220;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 9px;
+  font-size: .95rem;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.status {
+  background: #0b1220;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: .9rem;
+}
+.ok { color: var(--ok); }
+.err { color: var(--err); }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th, td {
+  border-bottom: 1px solid var(--border);
+  padding: 8px;
+  font-size: .92rem;
+  text-align: left;
+}
+th {
+  color: var(--muted);
+  font-weight: 600;
+}
+tr:hover td {
+  background: rgba(255,255,255,.03);
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+/* Gantt container */
+#gantt.gantt-container {
+    width: 100%;
+    height: 420px; /* ajuste si besoin */
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #0b1220;
+    overflow: hidden;
+
+    /* 🚩 SUPPRIMÉ : Lignes de forçage en 'white' et 'black' */
+    /* background-color: white !important; */
+    /* color: black !important; */ 
+}
+
+/* 🟢 AJOUT CRITIQUE pour le Dark Mode 
+   Force le texte du Gantt en clair pour qu'il soit visible sur le fond sombre de la librairie. */
+.gantt .grid-header,
+.gantt .bar-label,
+.gantt .date {
+    fill: var(--text) !important; /* Texte en gris clair */
+}
+
+/* 🟢 (Optionnel) Ajout pour rendre la grille et les lignes de dépendances plus visibles */
+.gantt .grid-row,
+.gantt .bar-progress {
+    stroke: var(--muted) !important;
+    opacity: 0.5;
+}
+
+.gantt .upper-text {
+    fill: var(--text) !important;
+}
+
+.gantt .lower-text {
+    fill: var(--muted) !important;
+}
