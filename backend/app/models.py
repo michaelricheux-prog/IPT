@@ -1,84 +1,66 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, DateTime
-from sqlalchemy.orm import relationship 
-from .database import Base
+from sqlalchemy import Column, Integer, String, Float, ForeignKey
+from sqlalchemy.orm import relationship
+from ..database import Base
 
-# ----------------------------------------------------------------------
-# 1. TABLE D'ASSOCIATION (M:N) : Opération <-> Composant
-# ----------------------------------------------------------------------
-class AssociationComposantOperation(Base):
-    __tablename__ = "association_composant_operation"
-
-    # Clés étrangères vers les tables 'blocs' et 'composants'
-    operation_id = Column(Integer, ForeignKey('blocs.id'), primary_key=True)
-    composant_id = Column(Integer, ForeignKey('composants.id'), primary_key=True)
-
-    # Champ spécifique à la relation
-    quantite_requise = Column(Float, nullable=False) 
-
-    # Relations définies plus tard
-    operation = relationship("Bloc", back_populates="composants_requis")
-    composant = relationship("Composant", back_populates="operations_assoc")
-
-
-# ----------------------------------------------------------------------
-# 2. MODÈLE COMPOSANT (Inventaire / Stock)
-# ----------------------------------------------------------------------
-class Composant(Base):
-    __tablename__ = "composants"
-
+class Article(Base):
+    __tablename__ = "articles"
     id = Column(Integer, primary_key=True, index=True)
-    nom = Column(String, index=True, unique=True)
-    quantite_disponible = Column(Float)
-    unite = Column(String)
-    description = Column(String, nullable=True)
+    ArticleCode = Column(String, unique=True)
+    ArticleDesignation = Column(String)
+    dts = relationship("DT", back_populates="article")
 
-    # Relation vers la table d'association (par chaîne de caractères)
-    operations_assoc = relationship(
-        "AssociationComposantOperation", 
-        back_populates="composant",
-        cascade="all, delete-orphan"
-    )
-
-
-# ----------------------------------------------------------------------
-# 3. MODÈLE BLOC (Opération) - Mise à jour et Complète
-# ----------------------------------------------------------------------
-class Bloc(Base):
-    __tablename__ = "blocs"
-
+class cdc(Base):
+    __tablename__ = "cdc"
     id = Column(Integer, primary_key=True, index=True)
-    nom = Column(String, index=True) # Nom de l'Opération / Article
+    cdcCode = Column(String, unique=True)
+    cdcName = Column(String)
+    Capa = Column(Float)
+    opedt = relationship("OpeDT", back_populates="cdc")
 
-    # CHAMPS DE SUIVI ET CHARGE
-    quantite_a_produire = Column(Float, default=0.0)
-    quantite_produite = Column(Float, default=0.0)
-    temps_prevu = Column(Float, nullable=True)
-    temps_passe = Column(Float, default=0.0)
-    duree_prevue_semaine = Column(Float, nullable=True)
-    centre_charge_id = Column(Integer, nullable=True)
-    ordre_fabrication_id = Column(Integer, nullable=True)
+class DT(Base):
+    __tablename__ = "dt"
+    id = Column(Integer, primary_key=True, index=True)
+    DTCode = Column(String, unique=True, index=True)
+    article_id = Column(Integer, ForeignKey("articles.id"))
+    
+    article = relationship("Article", back_populates="dts")
+    opedt = relationship("OpeDT", back_populates="dt")
+    ofs = relationship("OF", back_populates="dt")
 
-    # CHAMPS DE PLANIFICATION
-    est_realisee = Column(Boolean, default=False)
+class OpeDT(Base):
+    __tablename__ = "opedt"
+    id = Column(Integer, primary_key=True, index=True)
+    dt_id = Column(Integer, ForeignKey("dt.id"))
+    description = Column(String)
+    ordre = Column(Integer)
+    cdc_id = Column(Integer, ForeignKey("cdc.id"))
+    charge = Column(Float)
+    duree_semaine = Column(Float)
+    
+    dt = relationship("DT", back_populates="opedt")
+    cdc = relationship("cdc", back_populates="opedt")
 
-    # 🔵 Nouvelles dates planifiées
-    date_debut_planifiee = Column(DateTime, nullable=True)
-    date_fin_planifiee   = Column(DateTime, nullable=True)
+class OF(Base):
+    __tablename__ = "of"
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String, unique=True)
+    dt_id = Column(Integer, ForeignKey("dt.id"))
+    start_date = Column(String)
+    end_date = Column(String)
+    mode = Column(String)  # ASAP / RETRO
+    
+    dt = relationship("DT", back_populates="ofs")
 
-    # Dépendance sur un autre Bloc
-    bloc_precedent_id = Column(Integer, ForeignKey('blocs.id'), nullable=True) 
-
-    # Relation réflexive (par chaîne de caractères)
-    bloc_precedent = relationship(
-        'Bloc', 
-        remote_side=[id], 
-        uselist=False,
-        backref="blocs_suivants"
-    )
-
-    # Relation pour les composants requis (par chaîne de caractères)
-    composants_requis = relationship(
-        "AssociationComposantOperation", 
-        back_populates="operation", 
-        cascade="all, delete-orphan" 
-    )
+class OPEOF(Base):
+    __tablename__ = "opeof"
+    id = Column(Integer, primary_key=True, index=True)
+    of_id = Column(Integer, ForeignKey("of.id"))
+    opedt_id = Column(Integer, ForeignKey("opedt.id"))
+    description = Column(String)
+    cdc_id = Column(Integer, ForeignKey("cdc.id"))
+    ordre = Column(Integer)
+    charge = Column(Float)
+    duree_semaine = Column(Float)
+    start_date = Column(String)
+    end_date = Column(String)
+    mode = Column(String)  # ASAP / RETRO

@@ -1,41 +1,27 @@
+# backend/app/main.py
+import os
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from .routers import bloc_router, planning_router, excel_router
-from .database import engine, Base
-from pathlib import Path
+from fastapi.responses import FileResponse
+from .routers import articles, cdc, dt  # <-- on importe le router
 
-# Init DB
+from ..database import Base, engine
+
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="IPT Cloud Modulaire")
+app = FastAPI(title="POC Articles")
+app.include_router(dt.router)
+app.include_router(articles.router)
+app.include_router(cdc.router)
 
-# Middleware
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-
-# Routers
-app.include_router(bloc_router.router)
-app.include_router(planning_router.router)
-app.include_router(excel_router.router)
-
-
-
-# Statiques
-BASE_DIR = Path(__file__).resolve().parent.parent.parent 
-
-STATIC_DIR = BASE_DIR / "static"
-INDEX_FILE = BASE_DIR / "index.html"
-
-# Montage du dossier static
-if STATIC_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-else:
-    print(f"⚠️ ATTENTION : Dossier static non trouvé à : {STATIC_DIR}")
+# Serveur frontend
+frontend_dir = os.path.join(os.path.dirname(__file__), "../../frontend")
+index_file = os.path.join(frontend_dir, "index.html")
+app.mount("/static", StaticFiles(directory=frontend_dir), name="static")
 
 @app.get("/")
-def index():
-    from fastapi.responses import FileResponse
-    if INDEX_FILE.exists():
-        return FileResponse(str(INDEX_FILE))
-    return {"error": f"index.html introuvable à la racine {BASE_DIR}"}
+def root():
+    return FileResponse(index_file)
 
+# ✅ Inclure les routes
+app.include_router(articles.router)

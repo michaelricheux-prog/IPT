@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POC Gestion Articles & DT</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+</head>
+<body>
+
+<!-- Header -->
+<header>
+    <h1>POC Gestion Articles & DT</h1>
+</header>
+
+<div class="container">
+    <!-- Sidebar / Menu -->
+    <nav>
+        <a href="#" class="menu-item active" data-target="articles-section">Articles</a>
+        <a href="#" class="menu-item" data-target="cdc-section">cdc</a>
+        <a href="#" class="menu-item" data-target="dt-section">DT</a>
+    </nav>
+
+    <!-- Main content -->
+    <main>
+        <!-- =================== ARTICLES =================== -->
+        <section id="articles-section">
+            <h2>Articles</h2>
+            <div class="top-bar">
+                <button id="btn-add-article">➕ Ajouter un article</button>
+            </div>
+            <table>
+                <thead>
+                    <tr><th>ArticleCode</th><th>Désignation</th><th>Actions</th></tr>
+                </thead>
+                <tbody id="tbody-articles">
+                    <tr><td colspan="3">Chargement...</td></tr>
+                </tbody>
+            </table>
+
+            <!-- MODAL ARTICLE -->
+            <div class="modal-overlay" id="article-modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 id="modal-title">Ajouter un Article</h3>
+                        <button id="modal-close">&times;</button>
+                    </div>
+                    <form id="article-form">
+                        <label for="ArticleCode">ArticleCode</label>
+                        <input type="text" id="ArticleCode" required>
+                        <label for="ArticleDesignation">Désignation</label>
+                        <input type="text" id="ArticleDesignation" required>
+                        <div class="modal-footer">
+                            <button type="button" id="modal-cancel">Annuler</button>
+                            <button type="submit" id="modal-save">Enregistrer</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </section>
+<!-- =================== cdc =================== -->
+<section id="cdc-section">
+    <h2>Centres de Charge (cdc)</h2>
+    <div class="top-bar">
+        <button id="btn-add-cdc">➕ Ajouter un cdc</button>
+    </div>
+    <table>
+        <thead>
+            <tr><th>cdcCode</th><th>Nom</th><th>Capacité (h)</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="tbody-cdcs">
+            <tr><td colspan="4">Chargement...</td></tr>
+        </tbody>
+    </table>
+
+    <!-- MODAL cdc -->
+    <div class="modal-overlay" id="cdc-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="cdc-modal-title">Ajouter un cdc</h3>
+                <button id="cdc-modal-close">&times;</button>
+            </div>
+            <form id="cdc-form">
+                <label for="cdcCode">cdcCode</label>
+                <input type="text" id="cdcCode" required>
+                <label for="cdcName">Nom</label>
+                <input type="text" id="cdcName" required>
+                <label for="cdcCapa">Capacité (heures)</label>
+                <input type="number" id="cdcCapa" required step="0.01">
+                <div class="modal-footer">
+                    <button type="button" id="cdc-modal-cancel">Annuler</button>
+                    <button type="submit" id="cdc-modal-save">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</section>
+        <!-- =================== DT =================== -->
+        <section id="dt-section">
+            <h2>DT</h2>
+            <div class="top-bar">
+                <button id="btn-add-dt">➕ Ajouter un DT</button>
+            </div>
+            <table>
+                <thead>
+                    <tr><th>DTCode</th><th>Article</th><th>Actions</th></tr>
+                </thead>
+                <tbody id="tbody-dts">
+                    <tr><td colspan="3">Chargement...</td></tr>
+                </tbody>
+            </table>
+
+            <!-- MODAL DT -->
+            <div class="modal-overlay" id="dt-modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 id="dt-modal-title">Ajouter un DT</h3>
+                        <button id="dt-modal-close">&times;</button>
+                    </div>
+                    <form id="dt-form">
+                        <label for="DTCode">DTCode</label>
+                        <input type="text" id="DTCode" required>
+                        <label for="article-select">Article</label>
+                        <select id="article-select" required>
+                            <option value="">Chargement...</option>
+                        </select>
+                        <div class="modal-footer">
+                            <button type="button" id="dt-modal-cancel">Annuler</button>
+                            <button type="submit" id="dt-modal-save">Enregistrer</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </section>
+    </main>
+</div>
+
+<!-- JS modules -->
+<script type="module" src="/static/js/main.js"></script>
+
+</body>
+</html>

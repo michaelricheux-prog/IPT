@@ -1,65 +1,66 @@
-from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import Optional
 
-# Schéma de base pour les données que l'utilisateur envoie
-class BlocBase(BaseModel):
-    nom: str = Field(..., description="Nom de l'Opération / Gamme.")
-
-    # NOUVEAUX CHAMPS
-    quantite_a_produire: Optional[float] = 0.0
-    quantite_produite: Optional[float] = 0.0
-    temps_prevu: Optional[float] = None
-    temps_passe: Optional[float] = 0.0
-    duree_prevue_semaine: Optional[float] = None
-    centre_charge_id: Optional[int] = None
-    ordre_fabrication_id: Optional[int] = None
-
-    # Champs de Planification existants
-    est_realisee: Optional[bool] = False 
-    bloc_precedent_id: Optional[int] = None 
-
-# Schéma utilisé pour la CRÉATION d'un bloc (hérite de BlocBase)
-class BlocCreate(BlocBase):
-    pass
-
-# Schéma utilisé pour la MISE À JOUR d'un bloc (rend les champs optionnels)
-class BlocUpdate(BaseModel):
-    nom: Optional[str] = None
-    quantite_a_produire: Optional[float] = None
-    quantite_produite: Optional[float] = None
-    temps_prevu: Optional[float] = None
-    temps_passe: Optional[float] = None
-    duree_prevue_semaine: Optional[float] = None
-    centre_charge_id: Optional[int] = None
-    ordre_fabrication_id: Optional[int] = None
-    est_realisee: Optional[bool] = None
-    bloc_precedent_id: Optional[int] = None
-
-
-# Schéma utilisé pour la LECTURE d'un bloc (données sortantes)
-# Il inclut l'ID et configure Pydantic pour lire les données des objets SQLAlchemy
-class Bloc(BlocBase):
-    id: int
-    
-    # 🔵 Dates planifiées en sortie
-    date_debut_planifiee: Optional[datetime] = None
-    date_fin_planifiee: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
-class ComposantBase(BaseModel):
-    nom: str
-    quantite_disponible: float
-    unite: str
-
-class Composant(ComposantBase):
+class ArticleBase(BaseModel):
+    ArticleCode: str
+    ArticleDesignation: str
+class ArticleCreate(ArticleBase): pass
+class ArticleUpdate(BaseModel):
+    ArticleDesignation: Optional[str] = None
+class Article(ArticleBase):
     id: int
     class Config:
         from_attributes = True
 
-class NomenclatureRead(BaseModel):
-    composant: Composant
-    quantite_requise: float
+class cdcBase(BaseModel):
+    cdcCode: str
+    cdcName: str
+    Capa: float
+class cdcCreate(cdcBase): pass
+class cdcUpdate(BaseModel):
+    cdcName: Optional[str] = None
+    Capa: Optional[float] = None
+class cdc(cdcBase):
+    id: int
+    class Config:
+        from_attributes = True
+
+class DTBase(BaseModel):
+    DTCode: str
+    article_id: int
+class DTCreate(DTBase): pass
+class DTUpdate(BaseModel):
+    article_id: Optional[int] = None
+
+class DT(DTBase):
+    id: int
+    class Config:
+        from_attributes = True
+
+class DT(BaseModel):
+    id: int
+    DTCode: str
+    article_id: int
+    article: Optional[Article]  # inclure la désignation
+
+    class Config:
+        orm_mode = True
+
+class OpeDTBase(BaseModel):
+    dt_id: int
+    description: str
+    ordre: int
+    cdc_id: int
+    charge: float
+    duree_semaine: float
+class OpeDTCreate(OpeDTBase): pass
+class OpeDTUpdate(BaseModel):
+    description: Optional[str] = None
+    ordre: Optional[int] = None
+    cdc_id: Optional[int] = None
+    charge: Optional[float] = None
+    duree_semaine: Optional[float] = None
+class OpeDT(OpeDTBase):
+    id: int
     class Config:
         from_attributes = True
