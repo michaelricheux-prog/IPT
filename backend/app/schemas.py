@@ -47,5 +47,19 @@ class Bloc(BlocBase):
     date_fin_planifiee: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
+class ComposantBase(BaseModel):
+    nom: str
+    quantite_disponible: float
+    unite: str
 
+class Composant(ComposantBase):
+    id: int
+    class Config:
+        from_attributes = True
+
+class NomenclatureRead(BaseModel):
+    composant: Composant
+    quantite_requise: float
+    class Config:
+        from_attributes = True

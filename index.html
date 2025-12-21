@@ -1,153 +1,199 @@
-
 <!doctype html>
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
-  <title>PoC Planification des Opérations (FastAPI + Gantt)</title>
+  <title>IPT Cloud 2025 - Dashboard Industriel</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-  <!-- ✅ Ton CSS -->
-  <link rel="stylesheet" href="/static/styles.css">
-
-  <!-- ✅ Frappe Gantt (CDN) : CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt/dist/frappe-gantt.css">
   
+  <link rel="stylesheet" href="/static/styles.css">
+  
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt/dist/frappe-gantt.css">
 </head>
 <body>
-  <main>
-    <h1>PoC Planification des Opérations (FastAPI + Gantt)</h1>
 
-    <!-- 🏢 Outil de Planification des Opérations (PoC) -->
-    <section class="panel">
-      <h2>🏢 Outil de Planification des Opérations (PoC)</h2>
-      <div id="planning-panel" class="hidden">
-        <h3>⏱ Planification en temps réel</h3>
-        <div class="row">
-          <label><input type="radio" name="mode" value="asap" checked> ASAP (date au plus tôt)</label>
-          <label><input type="radio" name="mode" value="retro"> RETRO (date au plus tard)</label>
+  <header class="top-bar">
+    <div class="header-left">
+      <span class="app-title">IPT Cloud 2025</span>
+    </div>
+    <nav class="top-menu">
+      <a href="/docs" target="_blank">Docs API</a>
+      <div class="user-profile">👤 Administrateur</div>
+    </nav>
+  </header>
+
+  <div class="app-layout">
+    
+    <aside class="sidebar-resizable" id="resizable-sidebar">
+      <div class="sidebar-content">
+        <div class="brand">
+          <span class="logo">🛠</span>
+          <span class="brand-name">IPT Planning</span>
         </div>
-        <div class="row" id="asap-row">
-          <label>
-            Date de départ (ASAP)
-            <input type="datetime-local" id="start_date">
-          </label>
+        <nav class="side-nav">
+          <ul>
+            <li class="active"><a href="#section-gantt">📈 Vue Gantt</a></li>
+            <li><a href="#section-planif">📅 Planification</a></li>
+            <li><a href="#section-list">📋 Opérations</a></li>
+            <li><a href="#section-data">📊 Import / Export</a></li>
+          </ul>
+        </nav>
+      </div>
+      <div class="resizer" id="drag-handle"></div>
+    </aside>
+
+    <main class="content">
+      
+      <section id="section-gantt" class="panel">
+        <div class="panel-header">
+          <h2>📈 Diagramme de Gantt</h2>
+          <div class="header-actions">
+            <select id="gantt-view-mode" class="small-select">
+              <option value="Day">Jour</option>
+              <option value="Week" selected>Semaine</option>
+              <option value="Month">Mois</option>
+            </select>
+            <button id="btn-refresh" class="secondary">🔄 Actualiser</button>
+          </div>
         </div>
-        <div class="row hidden" id="retro-row">
-          <label>
-            Date d’échéance (RETRO)
-            <input type="datetime-local" id="due_date">
-          </label>
+        <div id="gantt" class="gantt-container"></div>
+      </section>
+
+      <section id="section-planif" class="panel">
+        <div id="planning-panel">
+          <h2>🏢 Outil de Planification</h2>
+          <div class="grid-form">
+            <div class="form-group">
+              <label>Mode de calcul</label>
+              <select id="plan-mode" name="mode" onchange="togglePlanningDateRows(this.value)">
+                <option value="asap">ASAP (Au plus tôt)</option>
+                <option value="retro">RETRO (Au plus tard)</option>
+              </select>
+            </div>
+
+            <div id="asap-row" class="form-group">
+              <label>Date de début</label>
+              <input type="datetime-local" id="start_date">
+            </div>
+
+            <div id="retro-row" class="form-group hidden">
+              <label>Date d'échéance (Due Date)</label>
+              <input type="datetime-local" id="due_date">
+            </div>
+
+            <div class="form-group" style="align-self: flex-end;">
+              <button class="primary" id="btn-run">🚀 Lancer le calcul</button>
+            </div>
+          </div>
+          <div id="status-planning" class="status-msg"></div>
         </div>
-        <div class="row">
-          <button class="primary" id="btn-run">Calculer les dates</button>
-          <button id="btn-refresh">Rafraîchir la liste</button>
-          <span class="status mono" id="status-planning">Prêt.</span>
+      </section>
+
+      <section id="section-list" class="panel">
+        <div class="panel-header">
+          <h2>📋 Liste des Opérations</h2>
+          <div class="header-actions">
+            <input type="text" id="q" placeholder="Rechercher..." oninput="window.refreshAll()">
+            <button id="btn-load" class="secondary">🔄 Recharger</button>
+          </div>
         </div>
-      </div>
-    </section>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Nom</th>
+                <th>OF</th>
+                <th>Quté Prévue</th>
+                <th>Quté Prod.</th>
+                <th>T. Prévu</th>
+                <th>T. Passé</th>
+                <th>Semaine</th>
+                <th>Machine</th>
+                <th>Précédent</th>
+                <th>Statut</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-blocs">
+              <tr><td colspan="12" class="loading-text">Chargement des données...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <input type="hidden" id="page" value="1">
+        <input type="hidden" id="size" value="50">
+        <div id="status-list" class="status-msg"></div>
+      </section>
 
-    <!-- 📈 Diagramme de Gantt des Opérations -->
-    <section class="panel">
-      <h2>📈 Diagramme de Gantt des Opérations</h2>
-      <!-- Conteneur Gantt (rendu par Frappe Gantt) -->
-      <div id="gantt" class="gantt-container"></div>
-    </section>
+      <section id="section-data" class="panel">
+        <h2>📊 Gestion des Données</h2>
+        <div class="data-grid">
+          <div class="data-card">
+            <h4>Extraction</h4>
+            <div class="btn-group">
+              <button onclick="window.exportData()" class="btn-excel">Exporter .xlsx</button>
+              <button onclick="window.exportCSV()" class="btn-csv">Exporter .csv</button>
+            </div>
+          </div>
 
-    <!-- ➕ Créer une nouvelle Opération (POST) -->
-    <section class="panel">
-      <h2>➕ Créer une nouvelle Opération (POST)</h2>
-      <div class="row">
-        <label>Nom<input id="c_nom" placeholder="Nom de l'opération"></label>
-        <label>Qté à produire<input id="c_qap" type="number" step="0.01"></label>
-        <label>Temps prévu (h)<input id="c_tp" type="number" step="0.01"></label>
-        <label>Durée prévue (sem.)<input id="c_dps" type="number" step="0.01"></label>
-        <label>Centre charge ID<input id="c_cc" type="number" step="1"></label>
-        <label>OF ID<input id="c_of" type="number" step="1"></label>
-        <label>Dépend de (ID précédent)<input id="c_prev" type="number" step="1"></label>
-      </div>
-      <div class="row">
-        <button class="primary" id="btn-create">Créer l'Opération</button>
-        <span class="status mono" id="status-create">Prêt.</span>
-      </div>
-    </section>
+          <div class="data-card">
+            <h4>Importation</h4>
+            <div class="import-controls">
+              <div class="input-unit">
+                <input type="file" id="excelFile" accept=".xlsx">
+                <button onclick="window.importData()" class="btn-import">Charger Excel</button>
+              </div>
+              <div class="input-unit">
+                <input type="file" id="csvFile" accept=".csv">
+                <button onclick="window.importCSV()" class="btn-import-csv">Charger CSV</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-    <!-- ✏️ Modifier / Clôturer une Opération (PATCH) -->
-    <section class="panel">
-      <h2>✏️ Modifier / Clôturer une Opération (PATCH)</h2>
-      <div class="row">
-        <label>ID de l'opération<input id="u_id" type="number" step="1" placeholder="ID"></label>
-        <label>Nom<input id="u_nom" placeholder="(optionnel)"></label>
-        <label>Qté produite<input id="u_qp" type="number" step="0.01"></label>
-        <label>Temps passé (h)<input id="u_tpasse" type="number" step="0.01"></label>
-        <label>Qté à produire<input id="u_qap" type="number" step="0.01"></label>
-        <label>Durée prévue (sem.)<input id="u_dps" type="number" step="0.01"></label>
-        <label>Centre charge ID<input id="u_cc" type="number" step="1"></label>
-        <label>OF ID<input id="u_of" type="number" step="1"></label>
-        <label>Dépend de (ID précédent)<input id="u_prev" type="number" step="1"></label>
-        <label><input id="u_realisee" type="checkbox"> Opération Réalisée / Clôturée ?</label>
-      </div>
-      <div class="row">
-        <button class="primary" id="btn-update">Appliquer les Modifications</button>
-        <span class="status mono" id="status-update">Prêt.</span>
-      </div>
-    </section>
+    </main>
+  </div>
 
-    <!-- 📋 Liste des Opérations (GET) -->
-    <section class="panel">
-      <h2>📋 Liste des Opérations (GET)</h2>
-      <div class="row">
-        <label>Recherche (nom contient)<input id="q" placeholder="ex: montage"></label>
-        <label>Réalisée
-          <select id="est">
-            <option value="">(toutes)</option>
-            <option value="true">oui</option>
-            <option value="false">non</option>
-          </select>
-        </label>
-        <label>Centre charge ID<input id="f_cc" type="number" step="1"></label>
-        <label>OF ID<input id="f_of" type="number" step="1"></label>
-        <label>Trier par
-          <select id="order_by">
-            <option value="id">id</option>
-            <option value="nom">nom</option>
-            <option value="quantite_a_produire">qte à produire</option>
-            <option value="quantite_produite">qte produite</option>
-            <option value="temps_prevu">temps prévu</option>
-            <option value="temps_passe">temps passé</option>
-            <option value="duree_prevue_semaine">durée prévue (sem.)</option>
-            <option value="centre_charge_id">centre charge</option>
-            <option value="ordre_fabrication_id">OF</option>
-            <option value="est_realisee">réalisée</option>
-          </select>
-        </label>
-        <select id="order_dir">
-          <option value="asc">asc</option>
-          <option value="desc">desc</option>
-        </select>
-        <label>Page<input id="page" type="number" value="1" min="1"></label>
-        <label>Taille<input id="size" type="number" value="20" min="1" max="100"></label>
-        <button id="btn-load">Actualiser</button>
-        <span class="status mono" id="status-list">Prêt.</span>
-      </div>
-
-      <table>
-        <thead>
-          <tr>
-            <th>ID</th><th>Nom</th><th>OF ID</th><th>Qté à Prod.</th><th>Qté Prod.</th>
-            <th>Temps Prévu (h)</th><th>Temps Passé (h)</th><th>Durée Prévue (sem.)</th>
-            <th>Centre Charge ID</th><th>Dépend de (ID)</th><th>Réalisée</th><th>Action</th>
-          </tr>
-        </thead>
-        <tbody id="tbody-blocs">
-          <tr><td colspan="12" class="mono">Chargement…</td></tr>
-        </tbody>
-      </table>
-    </section>
-  </main>
-
-  <!-- ✅ Frappe Gantt (CDN) : JS -->
   <script src="https://cdn.jsdelivr.net/npm/frappe-gantt/dist/frappe-gantt.umd.js"></script>
+  
+  <script type="module" src="/static/js/app.js"></script>
 
-  <!-- ✅ Ton JS (contient le rendu Gantt avec new Gantt('#gantt', tasks, options) ) -->
- <script src="/static/app.js"></script>
+<div id="edit-modal" class="modal-overlay hidden">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Modifier l'Opération #<span id="modal-op-id"></span></h3>
+      <button onclick="closeModal()" class="btn-close">&times;</button>
+    </div>
+    <form id="edit-op-form">
+      <div class="form-group">
+        <label>Nom de l'opération</label>
+        <input type="text" id="edit-nom">
+      </div>
+      <div class="grid-form">
+        <div class="form-group">
+          <label>Quantité Prévue</label>
+          <input type="number" id="edit-qte-prev">
+        </div>
+        <div class="form-group">
+          <label>Quantité Prod.</label>
+          <input type="number" id="edit-qte-prod">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Machine (Centre de Charge)</label>
+        <select id="edit-machine">
+          <option value="TOUR-01">TOUR-01</option>
+          <option value="FRAISE-02">FRAISE-02</option>
+          <option value="MONTAGE">MONTAGE</option>
+        </select>
+      </div>
+      <div class="modal-footer">
+        <button type="button" onclick="closeModal()" class="secondary">Annuler</button>
+        <button type="submit" class="primary">Enregistrer les modifications</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 </body>
+</html>

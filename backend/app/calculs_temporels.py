@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from typing import List
 
-from schemas import BlocBase  # Importation locale (évite l'import relatif quand on exécute le fichier directement)
+from backend.app.schemas import BlocBase  # Importation locale (évite l'import relatif quand on exécute le fichier directement)
 
 
 
