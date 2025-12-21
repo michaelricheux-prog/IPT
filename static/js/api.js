@@ -1,4 +1,4 @@
-/* frontend/js/api.js */
+/* static/js/api.js */
 export const API = {
     base: window.location.origin,
 

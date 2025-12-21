@@ -74,3 +74,13 @@ def delete_bloc(bloc_id: int, db: Session = Depends(get_db)):
     db.delete(db_bloc)
     db.commit()
     return {"message": "Bloc supprimé avec succès"}
+
+@router.get("/{bloc_id}", response_model=schemas.Bloc)
+def read_bloc(bloc_id: int, db: Session = Depends(get_db)):
+    """
+    Récupère un bloc unique par ID
+    """
+    db_bloc = db.query(models.Bloc).filter(models.Bloc.id == bloc_id).first()
+    if not db_bloc:
+        raise HTTPException(status_code=404, detail="Bloc non trouvé")
+    return db_bloc
