@@ -15,3 +15,16 @@ git add .
 git commit -m "Fix: ignore pycache and cleanup tracking"
 git push origin feature/core-localv2
 git checkout feature/core-localv2
+
+git add . 
+git commit -m "sauvegarde"
+git push origin feature/core-localv2
+
+git status
+
+git diff
+
+git checkout feature/core-localv2
+git pull origin feature/core-localv2
+git checkout -b feature/core-localv3
+git push -u origin feature/core-localv3
