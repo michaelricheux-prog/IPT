@@ -1,0 +1,17 @@
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+.\venv\Scripts\activate
+uvicorn backend.main:app --reload 
+git pull
+git branch
+git fetch --all
+git fetch --all --prune
+bash
+git pull --all
+git clone https://github.com/votre-nom/votre-projet.git
+git stash
+git pull origin feature/core-localv2
+git add .gitignore
+git add .
+git commit -m "Fix: ignore pycache and cleanup tracking"
+git push origin feature/core-localv2
+git checkout feature/core-localv2
